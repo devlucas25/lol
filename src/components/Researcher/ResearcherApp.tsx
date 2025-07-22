@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, List, User, LogOut, Play, CheckCircle } from 'lucide-react';
+import { MapPin, List, User, LogOut, Play, CheckCircle, History } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { GeolocationStatus } from '../GeolocationStatus';
 import { InterviewForm } from './InterviewForm';
+import { InterviewHistory } from './InterviewHistory';
 import { validateGeofence } from '../../utils/geolocation';
 
 export function ResearcherApp() {
-  const [currentView, setCurrentView] = useState<'tasks' | 'interview'>('tasks');
+  const [currentView, setCurrentView] = useState<'tasks' | 'interview' | 'history'>('tasks');
   const [selectedSurvey, setSelectedSurvey] = useState<any>(null);
   const [selectedArea, setSelectedArea] = useState<any>(null);
   
@@ -66,6 +67,53 @@ export function ResearcherApp() {
     );
   }
 
+  if (currentView === 'history') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Mobile Header */}
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">Histórico</h1>
+                <p className="text-sm text-gray-600">Suas entrevistas realizadas</p>
+              </div>
+              <button
+                onClick={logout}
+                className="p-2 text-gray-600 hover:text-gray-900"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="p-4">
+          <InterviewHistory />
+        </div>
+
+        {/* Bottom Navigation */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
+          <div className="flex">
+            <button
+              onClick={() => setCurrentView('tasks')}
+              className="flex-1 flex flex-col items-center py-3 text-gray-600 hover:text-blue-600"
+            >
+              <List className="w-5 h-5 mb-1" />
+              <span className="text-xs">Tarefas</span>
+            </button>
+            <button
+              onClick={() => setCurrentView('history')}
+              className="flex-1 flex flex-col items-center py-3 text-blue-600"
+            >
+              <History className="w-5 h-5 mb-1" />
+              <span className="text-xs">Histórico</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile Header */}
@@ -193,6 +241,26 @@ export function ResearcherApp() {
               );
             })
           )}
+        </div>
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
+        <div className="flex">
+          <button
+            onClick={() => setCurrentView('tasks')}
+            className="flex-1 flex flex-col items-center py-3 text-blue-600"
+          >
+            <List className="w-5 h-5 mb-1" />
+            <span className="text-xs">Tarefas</span>
+          </button>
+          <button
+            onClick={() => setCurrentView('history')}
+            className="flex-1 flex flex-col items-center py-3 text-gray-600 hover:text-blue-600"
+          >
+            <History className="w-5 h-5 mb-1" />
+            <span className="text-xs">Histórico</span>
+          </button>
         </div>
       </div>
     </div>

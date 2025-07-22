@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Plus, BarChart3, Users, MapPin, Settings, LogOut } from 'lucide-react';
+import { Plus, BarChart3, Users, MapPin, Settings, LogOut, UserCheck } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { SurveyCreator } from './SurveyCreator';
 import { SurveyList } from './SurveyList';
 import { SurveyMonitor } from './SurveyMonitor';
+import { UserManagement } from './UserManagement';
 
-type AdminView = 'dashboard' | 'create' | 'monitor';
+type AdminView = 'dashboard' | 'create' | 'monitor' | 'users';
 
 export function AdminDashboard() {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
@@ -35,6 +36,12 @@ export function AdminDashboard() {
             }}
           />
         ) : null;
+      case 'users':
+        return (
+          <UserManagement 
+            onBack={() => setCurrentView('dashboard')}
+          />
+        );
       default:
         return (
           <div className="space-y-6">
@@ -135,6 +142,17 @@ export function AdminDashboard() {
           >
             <Plus className="w-4 h-4" />
             <span>Nova Pesquisa</span>
+          </button>
+          <button
+            onClick={() => setCurrentView('users')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-md font-medium ${
+              currentView === 'users'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>Usuários</span>
           </button>
         </div>
 

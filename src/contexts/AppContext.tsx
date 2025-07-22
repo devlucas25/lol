@@ -111,12 +111,11 @@ export function AppProvider({ children }: AppProviderProps) {
   };
 
   const loadSurveys = async () => {
-    if (!currentUser) return;
 
     try {
       let query = supabase.from('surveys').select('*');
       
-      if (currentUser.role === 'admin') {
+      if (currentUser?.role === 'admin') {
         query = query.eq('admin_id', currentUser.id);
       } else {
         query = query.eq('status', 'active');
@@ -178,12 +177,11 @@ export function AppProvider({ children }: AppProviderProps) {
   };
 
   const loadInterviews = async () => {
-    if (!currentUser) return;
 
     try {
       let query = supabase.from('interviews').select('*');
       
-      if (currentUser.role === 'researcher') {
+      if (currentUser?.role === 'researcher') {
         query = query.eq('researcher_id', currentUser.id);
       }
 
