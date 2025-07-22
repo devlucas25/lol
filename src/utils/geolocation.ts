@@ -46,7 +46,7 @@ export function calculateHaversineDistance(
 }
 
 /**
- * Obtém a localização atual do usuário
+ * Obtém a localização atual do usuário com configurações otimizadas
  */
 export function getCurrentLocation(): Promise<GPSCoordinate> {
   return new Promise((resolve, reject) => {
@@ -56,9 +56,9 @@ export function getCurrentLocation(): Promise<GPSCoordinate> {
     }
     
     const options: PositionOptions = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 60000 // Cache por 1 minuto
+      enableHighAccuracy: true, // Usar GPS quando disponível
+      timeout: 15000, // 15 segundos timeout
+      maximumAge: 30000 // Cache por 30 segundos
     };
     
     navigator.geolocation.getCurrentPosition(
@@ -75,13 +75,13 @@ export function getCurrentLocation(): Promise<GPSCoordinate> {
         
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            message = 'Permissão de localização negada pelo usuário';
+            message = 'Permissão de localização negada. Por favor, habilite a localização nas configurações do navegador.';
             break;
           case error.POSITION_UNAVAILABLE:
-            message = 'Localização indisponível';
+            message = 'Localização indisponível. Verifique se o GPS está ativo.';
             break;
           case error.TIMEOUT:
-            message = 'Timeout ao obter localização';
+            message = 'Timeout ao obter localização. Tente novamente.';
             break;
         }
         
@@ -94,12 +94,13 @@ export function getCurrentLocation(): Promise<GPSCoordinate> {
 
 /**
  * Valida se o usuário está dentro da área permitida (geofencing)
- * Regra: Distância deve ser <= 100 metros do centro da área
+ * REGRA CRÍTICA: Distância deve ser <= 100 metros do centro da área
+ * REGRA DE BLOQUEIO: Botão "Iniciar Nova Entrevista" só fica ativo se válido
  */
 export function validateGeofence(
   currentLocation: GPSCoordinate,
   areaCenter: { lat: number; lng: number },
-  maxDistance: number = 100
+  maxDistance: number = 100 // Padrão: 100 metros conforme especificação
 ): GeofenceValidation {
   const distance = calculateHaversineDistance(currentLocation, areaCenter);
   
@@ -117,7 +118,7 @@ export function validateGeofence(
 }
 
 /**
- * Monitora a localização em tempo real
+ * Monitora a localização em tempo real com configurações otimizadas
  */
 export function watchLocation(
   callback: (location: GPSCoordinate) => void,
@@ -130,8 +131,8 @@ export function watchLocation(
   
   const options: PositionOptions = {
     enableHighAccuracy: true,
-    timeout: 5000,
-    maximumAge: 30000
+    timeout: 10000, // 10 segundos para updates
+    maximumAge: 15000 // Cache por 15 segundos para updates
   };
   
   return navigator.geolocation.watchPosition(
@@ -144,7 +145,21 @@ export function watchLocation(
       });
     },
     (error) => {
-      errorCallback?.(new Error(`Erro no monitoramento: ${error.message}`));
+      let message = 'Erro no monitoramento de localização';
+      
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          message = 'Permissão de localização foi revogada';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          message = 'Localização temporariamente indisponível';
+          break;
+        case error.TIMEOUT:
+          message = 'Timeout no monitoramento de localização';
+          break;
+      }
+      
+      errorCallback?.(new Error(message));
     },
     options
   );
@@ -160,22 +175,30 @@ export function stopWatchingLocation(watchId: number): void {
 /**
  * Verifica se a localização está disponível e solicita permissão
  */
-export async function requestLocationPermission(): Promise<boolean> {
+export async function requestLocationPermission(): Promise<{
+  granted: boolean;
+  error?: string;
+}> {
   if (!navigator.geolocation) {
-    return false;
+    return {
+      granted: false,
+      error: 'Geolocalização não é suportada neste dispositivo'
+    };
   }
   
   try {
     await getCurrentLocation();
-    return true;
+    return { granted: true };
   } catch (error) {
-    console.error('Erro ao solicitar permissão de localização:', error);
-    return false;
+    return {
+      granted: false,
+      error: error instanceof Error ? error.message : 'Erro desconhecido'
+    };
   }
 }
 
 /**
- * Formata coordenadas para exibição
+ * Formata coordenadas para exibição amigável
  */
 export function formatCoordinates(lat: number, lng: number): string {
   const latDir = lat >= 0 ? 'N' : 'S';
@@ -208,4 +231,70 @@ export function calculateCoverageArea(
     east: center.lng + lngDelta,
     west: center.lng - lngDelta
   };
+}
+
+/**
+ * Valida se as coordenadas estão dentro de limites válidos
+ */
+export function validateCoordinates(lat: number, lng: number): {
+  isValid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+  
+  if (lat < -90 || lat > 90) {
+    errors.push('Latitude deve estar entre -90 e 90 graus');
+  }
+  
+  if (lng < -180 || lng > 180) {
+    errors.push('Longitude deve estar entre -180 e 180 graus');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Calcula a precisão estimada baseada na accuracy do GPS
+ */
+export function getLocationQuality(accuracy?: number): {
+  quality: 'excellent' | 'good' | 'fair' | 'poor';
+  message: string;
+  color: string;
+} {
+  if (!accuracy) {
+    return {
+      quality: 'poor',
+      message: 'Precisão desconhecida',
+      color: '#6B7280'
+    };
+  }
+  
+  if (accuracy <= 5) {
+    return {
+      quality: 'excellent',
+      message: 'Precisão excelente',
+      color: '#10B981'
+    };
+  } else if (accuracy <= 15) {
+    return {
+      quality: 'good',
+      message: 'Boa precisão',
+      color: '#059669'
+    };
+  } else if (accuracy <= 50) {
+    return {
+      quality: 'fair',
+      message: 'Precisão aceitável',
+      color: '#F59E0B'
+    };
+  } else {
+    return {
+      quality: 'poor',
+      message: 'Precisão baixa',
+      color: '#EF4444'
+    };
+  }
 }

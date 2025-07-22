@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Info, AlertTriangle } from 'lucide-react';
-import { calculateSampleSize, calculateStratifiedQuotas, calculateWorkload, type ConfidenceLevel } from '../utils/statistical';
+import { Calculator, Info, AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react';
+import { 
+  calculateSampleSize, 
+  calculateStratifiedQuotas, 
+  calculateWorkload, 
+  validateStatisticalParameters,
+  type ConfidenceLevel 
+} from '../utils/statistical';
 
 interface StatisticalCalculatorProps {
   onCalculationComplete: (result: {
@@ -39,28 +45,50 @@ export function StatisticalCalculator({ onCalculationComplete }: StatisticalCalc
   ]);
 
   const [calculation, setCalculation] = useState<any>(null);
+  const [validationResult, setValidationResult] = useState<any>(null);
 
   useEffect(() => {
-    // Recalcular automaticamente quando os parâmetros mudarem
-    const sampleResult = calculateSampleSize(
-      confidenceLevel,
-      marginError,
-      expectedProportion / 100,
-      populationSize
-    );
+    try {
+      // Validar parâmetros
+      const validation = validateStatisticalParameters(
+        confidenceLevel,
+        marginError,
+        expectedProportion / 100,
+        populationSize
+      );
+      setValidationResult(validation);
 
-    const quotas = calculateStratifiedQuotas(sampleResult.finalSample, areas);
-    const workload = calculateWorkload(sampleResult.finalSample, fieldDays, numberOfResearchers);
+      if (!validation.isValid) {
+        return;
+      }
 
-    const result = {
-      sampleSize: sampleResult.finalSample,
-      quotas,
-      workload,
-      details: sampleResult
-    };
+      // Calcular amostra
+      const sampleResult = calculateSampleSize(
+        confidenceLevel,
+        marginError,
+        expectedProportion / 100,
+        populationSize
+      );
 
-    setCalculation(result);
-    onCalculationComplete(result);
+      // Calcular cotas estratificadas
+      const quotas = calculateStratifiedQuotas(sampleResult.finalSample, areas);
+      
+      // Calcular carga de trabalho
+      const workload = calculateWorkload(sampleResult.finalSample, fieldDays, numberOfResearchers);
+
+      const result = {
+        sampleSize: sampleResult.finalSample,
+        quotas,
+        workload,
+        details: sampleResult
+      };
+
+      setCalculation(result);
+      onCalculationComplete(result);
+    } catch (error) {
+      console.error('Erro no cálculo:', error);
+      setCalculation(null);
+    }
   }, [confidenceLevel, marginError, expectedProportion, populationSize, fieldDays, numberOfResearchers, areas, onCalculationComplete]);
 
   const addArea = () => {
@@ -88,6 +116,39 @@ export function StatisticalCalculator({ onCalculationComplete }: StatisticalCalc
           <Calculator className="w-5 h-5 text-blue-600" />
           <h3 className="text-lg font-semibold text-gray-900">Parâmetros Estatísticos</h3>
         </div>
+
+        {/* Validação de Parâmetros */}
+        {validationResult && (
+          <div className="mb-4 space-y-2">
+            {validationResult.errors.length > 0 && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                <div className="flex items-center space-x-2 mb-2">
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                  <span className="text-sm font-medium text-red-900">Erros de Validação</span>
+                </div>
+                <ul className="text-sm text-red-700 space-y-1">
+                  {validationResult.errors.map((error: string, index: number) => (
+                    <li key={index}>• {error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {validationResult.warnings.length > 0 && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <div className="flex items-center space-x-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                  <span className="text-sm font-medium text-yellow-900">Avisos</span>
+                </div>
+                <ul className="text-sm text-yellow-700 space-y-1">
+                  {validationResult.warnings.map((warning: string, index: number) => (
+                    <li key={index}>• {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -118,6 +179,7 @@ export function StatisticalCalculator({ onCalculationComplete }: StatisticalCalc
               onChange={(e) => setMarginError(Number(e.target.value))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <p className="text-xs text-gray-500 mt-1">Entre 1% e 10%</p>
           </div>
 
           <div>
@@ -149,24 +211,34 @@ export function StatisticalCalculator({ onCalculationComplete }: StatisticalCalc
               placeholder="Deixe vazio para população infinita"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Correção aplicada automaticamente se ≤ 10.000
+            </p>
           </div>
         </div>
 
-        {calculation && (
+        {calculation && validationResult?.isValid && (
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
-            <div className="flex items-center space-x-2 mb-2">
-              <Info className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-900">Resultado do Cálculo</span>
+            <div className="flex items-center space-x-2 mb-3">
+              <CheckCircle className="w-5 h-5 text-blue-600" />
+              <span className="text-lg font-bold text-blue-900">
+                Tamanho da Amostra Necessária: {calculation.sampleSize}
+              </span>
             </div>
-            <p className="text-lg font-bold text-blue-900">
-              Tamanho da Amostra: {calculation.sampleSize} entrevistas
-            </p>
-            <div className="text-xs text-blue-700 mt-1 space-y-1">
-              <p>Amostra base: {calculation.details.baseSample}</p>
-              {calculation.details.correctionApplied && (
-                <p>Correção para população finita aplicada</p>
-              )}
-              <p>Z-score: {calculation.details.zScore}</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-700">
+              <div>
+                <p><strong>Amostra base:</strong> {calculation.details.baseSample}</p>
+                <p><strong>Z-score:</strong> {calculation.details.zScore}</p>
+                <p><strong>Proporção usada:</strong> {(calculation.details.details.p * 100).toFixed(1)}%</p>
+              </div>
+              <div>
+                <p><strong>Margem de erro:</strong> {(calculation.details.details.e * 100).toFixed(1)}%</p>
+                {calculation.details.correctionApplied && (
+                  <p><strong>Correção aplicada:</strong> População finita</p>
+                )}
+                <p><strong>Fórmula:</strong> n = Z² × p(1-p) / e²</p>
+              </div>
             </div>
           </div>
         )}
@@ -214,34 +286,53 @@ export function StatisticalCalculator({ onCalculationComplete }: StatisticalCalc
           ))}
         </div>
 
-        {calculation && (
+        {calculation && validationResult?.isValid && (
           <div className="mt-4">
-            <h4 className="text-sm font-medium text-gray-900 mb-3">Cotas Calculadas</h4>
+            <h4 className="text-sm font-medium text-gray-900 mb-3">
+              Cotas Calculadas (Estratificação Proporcional)
+            </h4>
             <div className="space-y-2">
               {calculation.quotas.map((quota: any) => (
                 <div
                   key={quota.id}
-                  className={`flex items-center justify-between p-3 rounded-md ${
-                    quota.isValid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                  className={`flex items-center justify-between p-3 rounded-md border ${
+                    quota.isValid 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-red-50 border-red-200'
                   }`}
                 >
-                  <div>
-                    <span className="font-medium">{quota.name}</span>
-                    <span className="text-sm text-gray-600 ml-2">
-                      ({quota.percentage.toFixed(1)}% da população)
-                    </span>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">{quota.name}</span>
+                      <span className="text-sm text-gray-600">
+                        ({quota.percentage.toFixed(1)}% da população)
+                      </span>
+                      {!quota.isValid && (
+                        <div className="flex items-center text-red-600 text-xs">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          <span>Menos de 30 entrevistas</span>
+                        </div>
+                      )}
+                    </div>
+                    {quota.warning && (
+                      <p className="text-xs text-red-600 mt-1">{quota.warning}</p>
+                    )}
                   </div>
                   <div className="text-right">
-                    <span className="font-bold">{quota.quota} entrevistas</span>
-                    {!quota.isValid && (
-                      <div className="flex items-center text-red-600 text-xs mt-1">
-                        <AlertTriangle className="w-3 h-3 mr-1" />
-                        <span>Menos de 30 entrevistas</span>
-                      </div>
-                    )}
+                    <span className="font-bold text-lg">{quota.quota}</span>
+                    <span className="text-sm text-gray-600 ml-1">entrevistas</span>
                   </div>
                 </div>
               ))}
+            </div>
+            
+            <div className="mt-3 p-3 bg-gray-50 rounded-md">
+              <p className="text-sm text-gray-600">
+                <strong>Fórmula:</strong> n_i = n_final × (N_i / N_total)
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Soma das cotas: {calculation.quotas.reduce((sum: number, q: any) => sum + q.quota, 0)} = {calculation.sampleSize} ✓
+              </p>
             </div>
           </div>
         )}
@@ -279,26 +370,38 @@ export function StatisticalCalculator({ onCalculationComplete }: StatisticalCalc
           </div>
         </div>
 
-        {calculation && (
+        {calculation && validationResult?.isValid && (
           <div
             className="p-4 rounded-md border"
             style={{
-              backgroundColor: `${calculation.workload.color}10`,
+              backgroundColor: `${calculation.workload.color}15`,
               borderColor: `${calculation.workload.color}40`
             }}
           >
-            <div className="flex items-center space-x-2 mb-2">
+            <div className="flex items-center space-x-2 mb-3">
               <div
-                className="w-3 h-3 rounded-full"
+                className="w-4 h-4 rounded-full"
                 style={{ backgroundColor: calculation.workload.color }}
               />
-              <span className="font-medium" style={{ color: calculation.workload.color }}>
+              <span className="font-medium text-lg" style={{ color: calculation.workload.color }}>
                 {calculation.workload.message}
               </span>
             </div>
-            <div className="text-sm text-gray-700 space-y-1">
-              <p>Entrevistas por dia: {calculation.workload.interviewsPerDay}</p>
-              <p>Entrevistas por pesquisador/dia: {calculation.workload.interviewsPerResearcher}</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+              <div>
+                <p><strong>Entrevistas por dia:</strong> {calculation.workload.interviewsPerDay}</p>
+                <p><strong>Por pesquisador/dia:</strong> {calculation.workload.interviewsPerResearcher}</p>
+              </div>
+              <div>
+                <p><strong>Fórmula:</strong> n_final ÷ (dias × pesquisadores)</p>
+                <p><strong>Classificação:</strong></p>
+                <ul className="text-xs mt-1 space-y-1">
+                  <li>• Verde (&lt;15): Ótima</li>
+                  <li>• Amarelo (15-25): Intensa</li>
+                  <li>• Vermelho (&gt;25): Excessiva</li>
+                </ul>
+              </div>
             </div>
           </div>
         )}
